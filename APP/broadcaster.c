@@ -32,12 +32,10 @@ static uint8_t Broadcaster_TaskID;
 // 广播数据 (包含UUID和测量数据)
 static uint8_t advertData[] = {
     0x02, GAP_ADTYPE_FLAGS, GAP_ADTYPE_FLAGS_GENERAL | GAP_ADTYPE_FLAGS_BREDR_NOT_SUPPORTED,//0-2
- //   0x12  , 0x09, 0x54, 0x26, 0x48, 0x20, 0x4D, 0x65, 0x74, 0x65, 0x72, 0x20, 0x35, 0x42, 0x72, 0x65, 0x65, 0x7A, 0x65,//设备名称：T&H Meter 5Breeze 3-21
-    0x0C, 0x16, 0xD2, 0xFC, // 长度、AD类型、UUID (BTHome UUID FCD2) 3-6
+    0x07, 0x16, 0xD2, 0xFC, // 长度、AD类型、UUID (BTHome UUID FCD2) 3-6
     0x40,                   // BTHome v2 无加密，定期广播 7
     0x01, 0x00,             // 电量 (占位符) 8-9
-    0x02, 0x00, 0x00,       // 温度 (占位符) 10-12
-    0x03, 0x00, 0x00        // 湿度 (占位符) 13-15
+    0x04, 0x00              // B14口状态 (0x04是自定义类型) 10-11
 };
 
 
@@ -143,37 +141,25 @@ int read_sht4x_data(float* temperature, float* humidity)
 
 __HIGH_CODE
 void update_advert_data() {
-    // 读取温湿度
-    float temp, humid;
     uint8_t BL_bat;
-    int sht4x_ret = read_sht4x_data(&temp, &humid);
+    
+    // 配置B14为输入模式
+    GPIOB_ModeCfg(GPIO_Pin_14, GPIO_ModeIN_PU);
+    
+    // 读取B14状态
+    uint8_t b14_state = GPIOB_ReadPortPin(GPIO_Pin_14);
 
     // 读取电池电压
     bat = sample_battery_voltage();
     BL_bat = (uint8_t)((bat-2500)/8);
     if (BL_bat > 100)
-        BL_bat =100;
+        BL_bat = 100;
+        
     // 更新广播包中的电量数据
     advertData[9] = BL_bat; // 电量百分比
 
-    if (sht4x_ret) {
-        // 更新温度数据
-        int16_t temp_data = (int16_t)(temp * 100); // 放大100倍为整数
-        advertData[11] = temp_data & 0xFF; // 温度低字节
-        advertData[12] = (temp_data >> 8) & 0xFF; // 温度高字节
-
-        // 更新湿度数据
-        uint16_t humid_data = (uint16_t)(humid * 100); // 放大100倍为整数
-        advertData[14] = humid_data & 0xFF; // 湿度低字节
-        advertData[15] = (humid_data >> 8) & 0xFF; // 湿度高字节
-    } else {
-        // 数据错误，填充默认值
-        advertData[9] = 0xFF; // 错误标志
-        advertData[11] = 0xFF; // 错误标志
-        advertData[12] = 0xFF; // 错误标志
-        advertData[14] = 0xFF; // 错误标志
-        advertData[15] = 0xFF; // 错误标志
-    }
+    // 更新B14状态
+    advertData[11] = b14_state ? 1 : 0;
 }
 
 
