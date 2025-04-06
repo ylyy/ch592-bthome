@@ -1,0 +1,11 @@
+# Ignore everything in obj directory
+obj/*
+# But keep hex files
+!obj/*.hex
+
+# Other common files to ignore
+*.o
+*.d
+*.lst
+*.map
+*.mk 
